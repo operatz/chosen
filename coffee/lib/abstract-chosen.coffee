@@ -124,12 +124,34 @@ class AbstractChosen
     else
       this.results_show()
 
+  separate: (str) ->
+    initial_consonant_map = ["ㄱ","ㄲ","ㄴ","ㄷ","ㄸ","ㄹ","ㅁ","ㅂ","ㅃ","ㅅ","ㅆ","ㅇ","ㅈ","ㅉ","ㅊ","ㅋ","ㅌ","ㅍ","ㅎ"];
+    vowel_map = ["ㅏ","ㅐ","ㅑ","ㅒ","ㅓ","ㅔ","ㅕ","ㅖ","ㅗ","ㅗㅏ","ㅗㅐ","ㅗㅣ","ㅛ","ㅜ","ㅜㅓ","ㅜㅔ","ㅜㅣ","ㅠ","ㅡ","ㅡㅣ","ㅣ"];
+    final_consonant_map = ["","ㄱ","ㄲ","ㄱㅅ","ㄴ","ㄴㅈ","ㄴㅎ","ㄷ","ㄹ","ㄹㄱ","ㄹㅁ","ㄹㅂ","ㄹㅅ","ㄹㅌ","ㄹㅍ","ㄹㅎ","ㅁ","ㅂ","ㅂㅅ","ㅅ","ㅆ","ㅇ","ㅈ","ㅊ","ㅋ"," ㅌ","ㅍ","ㅎ"];
+
+    result = ""
+    result_map = []
+    for i in [0..str.length-1]
+      code = str.charCodeAt i
+      if code >= 0xAC00 and code <= 0xD7A3
+        consonant1 = Math.floor((code - 0xAC00) / 28 / 21)
+        vowel = Math.floor((code - 0xAC00) / 28) % 21
+        consonant2 = (code - 0xAC00) % 28;
+        letter = initial_consonant_map[consonant1] + vowel_map[vowel] + final_consonant_map[consonant2]
+        result += letter
+        for j in [0..letter.length-1]
+          result_map.push i
+      else
+        result += str.charAt i
+        result_map.push i
+    [result, result_map]
+
   winnow_results: ->
     this.no_results_clear()
 
     results = 0
 
-    searchText = this.get_search_text()
+    searchText = this.separate(this.get_search_text())[0]
     escapedSearchText = searchText.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, "\\$&")
     zregex = new RegExp(escapedSearchText, 'i')
     regex = this.get_search_regex(escapedSearchText)
@@ -153,13 +175,18 @@ class AbstractChosen
         unless option.group and not @group_search
 
           option.search_text = if option.group then option.label else option.text
-          option.search_match = this.search_string_match(option.search_text, regex)
+          separated_result = @separate option.search_text
+          option.separated_text = separated_result[0]
+          option.separated_text_map = separated_result[1]
+          option.search_match = this.search_string_match(option.separated_text, regex)
           results += 1 if option.search_match and not option.group
 
           if option.search_match
             if searchText.length
-              startpos = option.search_text.search zregex
-              text = option.search_text.substr(0, startpos + searchText.length) + '</em>' + option.search_text.substr(startpos + searchText.length)
+              pos = option.separated_text.search zregex
+              startpos = option.separated_text_map[pos]
+              endpos = option.separated_text_map[pos + searchText.length - 1] + 1
+              text = option.search_text.substr(0, endpos) + '</em>' + option.search_text.substr(endpos)
               option.search_text = text.substr(0, startpos) + '<em>' + text.substr(startpos)
 
             results_group.group_match = true if results_group?
